@@ -1,0 +1,1137 @@
+^<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Der HN-Bauer – ABW Honorarnoten (Web)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f6fff6;
+      color: #0b2e0b;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      padding: 12px 16px 4px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      color: #006600;
+    }
+    .accent-bar {
+      height: 3px;
+      background: #33FF33;
+    }
+    main {
+      padding: 12px 16px 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .btn {
+      background: #006600;
+      color: #fff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+    .btn:hover {
+      background: #005500;
+    }
+    .btn.secondary {
+      background: #0b2e0b;
+    }
+    .days-toolbar {
+      margin: 8px 0 10px;
+    }
+    .day-card {
+      background: #ffffff;
+      border-radius: 6px;
+      border: 1px solid #cde9cd;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+    }
+    .day-card-header {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+    .day-card-header strong {
+      font-size: 1rem;
+      min-width: 70px;
+      display: inline-block;
+    }
+    .field-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 4px 0;
+      align-items: center;
+    }
+    label {
+      font-size: 0.9rem;
+    }
+    input[type="text"], input[type="password"], select {
+      padding: 2px 4px;
+      font-size: 0.9rem;
+    }
+    .block {
+      border-top: 1px solid #e2f2e2;
+      margin-top: 6px;
+      padding-top: 6px;
+    }
+    .block-title {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .checkbox-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .summary-box {
+      margin-top: 16px;
+    }
+    .summary-box h2 {
+      font-size: 1.1rem;
+      margin-bottom: 4px;
+    }
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 190px;
+      font-family: Consolas, monospace;
+      font-size: 0.85rem;
+      padding: 8px;
+    }
+    .day-card-footer {
+      margin-top: 4px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .danger {
+      background: #aa0000;
+    }
+    .danger:hover {
+      background: #880000;
+    }
+    @media (max-width: 700px) {
+      .field-row {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Login-Screen -->
+  <div id="login-screen" style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:#f0fff0;">
+    <div style="background:white; border:1px solid #cde9cd; border-radius:6px; padding:16px 20px; max-width:320px; width:100%; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+      <h2 style="margin-top:0; margin-bottom:8px; color:#006600; font-size:1.2rem;">
+        ABW Honorarnoten
+      </h2>
+      <p style="font-size:0.9rem; margin-bottom:10px;">
+        Bitte Passwort eingeben, um das Tool zu öffnen.
+      </p>
+      <form id="login-form">
+        <label style="font-size:0.9rem;">
+          Passwort:
+          <input type="password" id="login-password" style="width:100%; margin-top:4px; padding:4px 6px; box-sizing:border-box;">
+        </label>
+        <button type="submit"
+                style="margin-top:10px; width:100%; padding:6px 12px; background:#006600; color:#fff; border:none; border-radius:4px; font-weight:600; cursor:pointer;">
+          Login
+        </button>
+        <div id="login-error" style="color:#aa0000; font-size:0.85rem; margin-top:8px;"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- App (wird erst nach Passwort sichtbar) -->
+  <div id="app" style="display:none;">
+    <header>
+      <h1>Der HN-Bauer — Tage verwalten &amp; Monatsbericht (Web)</h1>
+    </header>
+    <div class="accent-bar"></div>
+    <main>
+      <div class="days-toolbar">
+        <button class="btn" id="btn-add-day">Neuer Tag</button>
+        <button class="btn secondary" id="btn-compute-all">Alle Tage berechnen</button>
+        <button class="btn secondary" id="btn-einsatz-png">Monats-PNG – Einsatz</button>
+        <button class="btn secondary" id="btn-bereitschaft-png">Monats-PNG – Bereitschaft</button>
+        <button class="btn secondary" id="btn-save">Daten speichern</button>
+        <button class="btn secondary" id="btn-load">Daten laden</button>
+        <input type="file" id="file-input" accept="application/json" style="display:none;">
+      </div>
+
+      <div id="days-container"></div>
+
+      <div class="summary-box">
+        <h2>Monatsübersicht (Summe über alle Tage)</h2>
+        <textarea id="summary" readonly></textarea>
+      </div>
+    </main>
+  </div>
+
+<script>
+  // === Konstanten (wie in v7.8) ===
+  const RATE_DAY = 36.0;
+  const RATE_NIGHT = 48.0;
+  const RATE_READY_WD = 2.5;
+  const RATE_READY_HOL = 4.2;
+  const EL_HOURS = 0.5;
+  const NB_MINUTES = 30;
+
+  const daysContainer = document.getElementById('days-container');
+  const summaryBox = document.getElementById('summary');
+  const fileInput = document.getElementById('file-input');
+
+  // ==== Hilfsfunktionen ====
+  function pad2(n) { return n.toString().padStart(2, '0'); }
+const MONTH_NAMES = [
+  "Januar","Februar","März","April","Mai","Juni",
+  "Juli","August","September","Oktober","November","Dezember"
+];
+
+
+  function formatDateTable(jsDate) {
+    return `${pad2(jsDate.getDate())}.${pad2(jsDate.getMonth()+1)}.${jsDate.getFullYear()}`;
+  }
+
+  function parseDateDDMMYYYY(s) {
+    const m = s.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (!m) throw new Error("Datum bitte als DD-MM-YYYY eingeben.");
+    const d = parseInt(m[1],10), mo = parseInt(m[2],10), y = parseInt(m[3],10);
+    return new Date(y, mo-1, d);
+  }
+
+  function parseHHMM(s) {
+    s = (s || "").trim();
+    if (!s) return null;
+    const m = s.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) throw new Error(`Ungültige Zeit: '${s}' (HH:MM)`);
+    let h = parseInt(m[1],10), mi = parseInt(m[2],10);
+    if (h<0 || h>23 || mi<0 || mi>59) throw new Error(`Ungültige Zeit: '${s}' (HH:MM)`);
+    return { h, mi };
+  }
+
+  function dtCombineDateTime(d, hhmm) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), hhmm.h, hhmm.mi, 0);
+  }
+
+  function overlapMinutes(start1, end1, start2, end2) {
+    const s = Math.max(start1.getTime(), start2.getTime());
+    const e = Math.min(end1.getTime(), end2.getTime());
+    if (e <= s) return 0;
+    return (e - s) / 60000;
+  }
+
+  // Tag/Nacht-Minuten
+  function splitDayNightMinutes(start, end, isHoliday) {
+    const total = (end.getTime() - start.getTime()) / 60000;
+    if (total <= 0) return { dayMin: 0, nightMin: 0 };
+    if (isHoliday) return { dayMin: 0, nightMin: total };
+
+    let dayMin = 0;
+    const t = new Date(start.getTime());
+    while (t < end) {
+      const h = t.getHours();
+      if (h >= 6 && h < 22) dayMin++;
+      t.setMinutes(t.getMinutes() + 1);
+    }
+    const nightMin = total - dayMin;
+    return { dayMin, nightMin };
+  }
+
+  // === UI: Tag-Karte erzeugen ===
+  let dayCounter = 0;
+  function createDayCard(defaultDate = null) {
+    dayCounter++;
+    const card = document.createElement('div');
+    card.className = 'day-card';
+
+    const now = defaultDate || new Date();
+    const dateStr = `${pad2(now.getDate())}-${pad2(now.getMonth()+1)}-${now.getFullYear()}`;
+
+    card.innerHTML = `
+      <div class="day-card-header">
+        <strong>Tag ${dayCounter}</strong>
+        <div>
+          <div class="field-row">
+            <label>Datum (DD-MM-YYYY):
+              <input type="text" class="inp-date" value="${dateStr}" size="10">
+            </label>
+            <label>Tagtyp:
+              <select class="sel-daytype">
+                <option value="Werktag">Werktag</option>
+                <option value="Sonn-/Feiertag">Sonn-/Feiertag</option>
+              </select>
+            </label>
+          </div>
+          <div class="field-row">
+            <label>Bereitschaft:
+              <select class="sel-ready">
+                <option value="12:00–24:00">12:00–24:00</option>
+                <option value="00:00–12:00">00:00–12:00</option>
+                <option value="Blaulicht">Blaulicht</option>
+              </select>
+            </label>
+            <label>
+              <input type="checkbox" class="chk-only-ready">
+              Nur Bereitschaft (keine Einsätze)
+            </label>
+          </div>
+          <div class="field-row">
+            <label>Bereitschaft – Anmerkung:
+              <input type="text" class="inp-ready-note" size="40">
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="blocks-container">
+        ${[1,2,3].map(i => `
+          <div class="block" data-block="${i}">
+            <div class="block-title">Einsatz ${i}</div>
+            <div class="field-row">
+              <label>Start (HH:MM)
+                <input type="text" class="b-start" size="5">
+              </label>
+              <label>Ende (HH:MM)
+                <input type="text" class="b-end" size="5">
+              </label>
+              <div class="checkbox-group">
+                <label><input type="checkbox" class="b-nb"> NB (30 Min)</label>
+                <label><input type="checkbox" class="b-el"> EL</label>
+                <label><input type="checkbox" class="b-bl"> Blaulicht</label>
+              </div>
+            </div>
+            <div class="field-row">
+              <label>Ereignisnr.
+                <input type="text" class="b-event" size="10">
+              </label>
+              <label>Indikation
+                <input type="text" class="b-ind" size="30">
+              </label>
+              <label>Anmerkung
+                <input type="text" class="b-note" size="30">
+              </label>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="day-card-footer">
+        <button class="btn secondary btn-calc-day">Diesen Tag berechnen</button>
+        <button class="btn danger btn-remove-day">Tag entfernen</button>
+        <span class="day-result" style="font-size:0.85rem; opacity:0.8;"></span>
+      </div>
+    `;
+
+    // Blaulicht -> Nur-Bereitschaft ausgrauen
+    const selReady = card.querySelector('.sel-ready');
+    const chkOnlyReady = card.querySelector('.chk-only-ready');
+    selReady.addEventListener('change', () => {
+      const isBL = selReady.value === 'Blaulicht';
+      if (isBL) {
+        chkOnlyReady.checked = false;
+        chkOnlyReady.disabled = true;
+      } else {
+        chkOnlyReady.disabled = false;
+      }
+    });
+
+    // Tag berechnen
+    card.querySelector('.btn-calc-day').addEventListener('click', () => {
+      try {
+        const out = computeDay(card);
+        card.querySelector('.day-result').textContent =
+          `Summe Einsatzstunden: ${out.sum_hours.toFixed(2)} h (ohne EL) | Bereitschaft: ${out.ready_hours.toFixed(2)} h | Gesamt: ${out.grand_total.toFixed(2)} €`;
+      } catch (e) {
+        alert(`Fehler im Tag ${dayCounter}:\n\n` + e.message);
+      }
+    });
+
+    // Tag entfernen
+    card.querySelector('.btn-remove-day').addEventListener('click', () => {
+      if (confirm('Diesen Tag wirklich löschen?')) {
+        card.remove();
+        computeAllDaysAndUpdateSummary();
+      }
+    });
+
+    daysContainer.appendChild(card);
+    return card;
+  }
+
+  // === Kernberechnung eines Tages ===
+  function computeDay(card) {
+    const dateStr = card.querySelector('.inp-date').value;
+    const dayType = card.querySelector('.sel-daytype').value;
+    const readyMode = card.querySelector('.sel-ready').value;
+    const onlyReady = card.querySelector('.chk-only-ready').checked;
+    const readyNote = card.querySelector('.inp-ready-note').value || "";
+    const jsDate = parseDateDDMMYYYY(dateStr);
+    const isHoliday = (dayType === "Sonn-/Feiertag");
+    const isBLDay = (readyMode === "Blaulicht");
+
+    let readyStart = null, readyEnd = null;
+    if (!isBLDay) {
+      if (readyMode.startsWith("00:00")) {
+        readyStart = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate(), 0, 0, 0);
+        readyEnd   = new Date(readyStart.getTime() + 12*60*60*1000);
+      } else { // 12:00–24:00
+        readyStart = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate(), 12, 0, 0);
+        const dayAfter = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate()+1);
+        readyEnd = dayAfter;
+      }
+    }
+
+    let totals = { day:0, night:0, nb_day:0, nb_night:0, el:0 };
+    let totalDeductMin = 0;
+    let results = [];
+    let anyBL = false;
+    let anyEntries = false;
+
+    const blocks = card.querySelectorAll('.block');
+    if (!onlyReady) {
+      let idx = 0;
+      blocks.forEach(block => {
+        idx++;
+        const sStr = block.querySelector('.b-start').value.trim();
+        const eStr = block.querySelector('.b-end').value.trim();
+        const nbOn = block.querySelector('.b-nb').checked;
+        const elOn = block.querySelector('.b-el').checked;
+        const blOn = block.querySelector('.b-bl').checked;
+        const ev = block.querySelector('.b-event').value.trim();
+        const ind = block.querySelector('.b-ind').value.trim();
+        const note = block.querySelector('.b-note').value.trim();
+
+        if (!sStr && !eStr) {
+          results.push([idx,0,0,0,0,elOn,0,null,null,nbOn,ev,ind,note,blOn]);
+          return;
+        }
+        anyEntries = true;
+        if (blOn) anyBL = true;
+
+        const sHH = parseHHMM(sStr);
+        const eHH = parseHHMM(eStr);
+        let start = dtCombineDateTime(jsDate, sHH);
+        let end   = dtCombineDateTime(jsDate, eHH);
+        if (end <= start) {
+          end = new Date(end.getTime() + 24*60*60*1000); // über Mitternacht
+        }
+
+        const { dayMin, nightMin } = splitDayNightMinutes(start, end, isHoliday);
+        const dayH = dayMin/60.0;
+        const nightH = nightMin/60.0;
+
+        let nbDayH = 0, nbNightH = 0;
+        if (nbOn) {
+          const nbStart = new Date(end.getTime());
+          const nbEnd = new Date(end.getTime() + NB_MINUTES*60000);
+          const nbSplit = splitDayNightMinutes(nbStart, nbEnd, isHoliday);
+          nbDayH = nbSplit.dayMin/60.0;
+          nbNightH = nbSplit.nightMin/60.0;
+        }
+
+        const elH = elOn ? EL_HOURS : 0;
+
+        totals.day += dayH;
+        totals.night += nightH;
+        totals.nb_day += nbDayH;
+        totals.nb_night += nbNightH;
+        totals.el += elH;
+
+        if (!isBLDay && !blOn && readyStart && readyEnd) {
+          totalDeductMin += overlapMinutes(start, end, readyStart, readyEnd);
+          if (nbOn) {
+            const nbStart = new Date(end.getTime());
+            const nbEnd = new Date(end.getTime() + NB_MINUTES*60000);
+            totalDeductMin += overlapMinutes(nbStart, nbEnd, readyStart, readyEnd);
+          }
+        }
+
+        results.push([idx,dayH,nightH,nbDayH,nbNightH,elOn,elH,start,end,nbOn,ev,ind,note,blOn]);
+      });
+    }
+
+    let readyHours = 0;
+    if (!isBLDay) {
+      if (onlyReady) {
+        readyHours = 12.0;
+      } else if (readyStart && readyEnd) {
+        const base = (readyEnd.getTime() - readyStart.getTime())/60000; // 720
+        const remaining = Math.max(0, base - totalDeductMin);
+        readyHours = remaining/60.0;
+      }
+    } else {
+      readyHours = 0;
+    }
+
+    const einsatzAmount =
+      totals.day * RATE_DAY +
+      totals.night * RATE_NIGHT +
+      totals.nb_day * RATE_DAY +
+      totals.nb_night * RATE_NIGHT;
+    const elAmount = totals.el * RATE_DAY;
+
+    let readyAmount = 0;
+    if (!isBLDay) {
+      if (isHoliday) {
+        readyAmount = readyHours * RATE_READY_HOL;
+      } else {
+        readyAmount = readyHours * RATE_READY_WD;
+      }
+    }
+
+    const grandTotal = einsatzAmount + elAmount + readyAmount;
+
+    return {
+      dateStr,
+      jsDate,
+      dateTable: formatDateTable(jsDate),
+      is_holiday: isHoliday,
+      ready_mode: readyMode,
+      is_bl_day: isBLDay,
+      only_ready: onlyReady,
+      ready_note: readyNote,
+      results,
+      sum_hours: totals.day + totals.night + totals.nb_day + totals.nb_night,
+      ready_hours: readyHours,
+      amount_einsatz: einsatzAmount,
+      amount_el: elAmount,
+      amount_ready: readyAmount,
+      grand_total: grandTotal,
+      any_bl: anyBL,
+      any_entries: anyEntries
+    };
+  }
+
+  // === Alle Tage berechnen & Monatsübersicht ===
+  function computeAllDays() {
+    const cards = daysContainer.querySelectorAll('.day-card');
+    const outs = [];
+    cards.forEach(card => {
+      outs.push(computeDay(card));
+    });
+    outs.sort((a,b) => a.jsDate - b.jsDate);
+    return outs;
+  }
+
+  function computeAllDaysAndUpdateSummary() {
+    summaryBox.value = "";
+    const cards = daysContainer.querySelectorAll('.day-card');
+    if (cards.length === 0) return;
+
+    let totals = { sum_hours:0, ready_hours:0, einsatz:0, el:0, ready:0, grand:0 };
+    const outs = computeAllDays();
+
+    summaryBox.value +=
+      `${'Datum'.padEnd(12)} ${'Typ'.padEnd(13)} ${'Bereitschaft'.padEnd(18)} ` +
+      `${'NurBer'.padEnd(6)} ${'BL-Tag'.padEnd(6)} ` +
+      `${'Std (ohne EL)'.padStart(13)} ${'Bereitschaft'.padStart(13)} ` +
+      `${'Einsatz €'.padStart(12)} ${'EL €'.padStart(8)} ${'Bereitschaft €'.padStart(16)} ${'Gesamt €'.padStart(12)}\n`;
+    summaryBox.value += '-'.repeat(140) + '\n';
+
+    outs.forEach(out => {
+      totals.sum_hours += out.sum_hours;
+      totals.ready_hours += out.ready_hours;
+      totals.einsatz += out.amount_einsatz;
+      totals.el += out.amount_el;
+      totals.ready += out.amount_ready;
+      totals.grand += out.grand_total;
+
+      const typ = out.is_holiday ? "Feiertag" : "Werktag";
+      const blt = (out.is_bl_day || out.any_bl) ? "Ja" : "Nein";
+      const line =
+        `${out.dateStr.padEnd(12)} ` +
+        `${typ.padEnd(13)} ` +
+        `${out.ready_mode.padEnd(18)} ` +
+        `${(out.only_ready ? 'Ja':'Nein').padEnd(6)} ` +
+        `${blt.padEnd(6)} ` +
+        `${out.sum_hours.toFixed(2).padStart(13)} ` +
+        `${out.ready_hours.toFixed(2).padStart(13)} ` +
+        `${out.amount_einsatz.toFixed(2).padStart(12)} ` +
+        `${out.amount_el.toFixed(2).padStart(8)} ` +
+        `${out.amount_ready.toFixed(2).padStart(16)} ` +
+        `${out.grand_total.toFixed(2).padStart(12)}`;
+
+      summaryBox.value += line + '\n';
+    });
+
+    summaryBox.value += '-'.repeat(140) + '\n';
+    const einsatzInclEL = totals.einsatz + totals.el;
+    summaryBox.value += `MONATS-TOTALS\n`;
+    summaryBox.value += `${'Einsätze inkl. EL (€):'.padEnd(44)}${einsatzInclEL.toFixed(2).padStart(12)}\n`;
+    summaryBox.value += `${'Bereitschaft (€):'.padEnd(44)}${totals.ready.toFixed(2).padStart(12)}\n`;
+    summaryBox.value += `${'GESAMT (€):'.padEnd(44)}${(einsatzInclEL + totals.ready).toFixed(2).padStart(12)}\n`;
+    summaryBox.value += '-'.repeat(140) + '\n';
+  }
+
+  // === PNG-Helfer: Textumbruch ===
+  function wrapTextLines(ctx, text, maxWidth) {
+    text = (text || "").toString();
+    if (!text.trim()) return [""];
+    const words = text.split(/\s+/);
+    const lines = [];
+    let cur = "";
+    for (const w of words) {
+      const test = (cur ? cur + " " + w : w);
+      if (ctx.measureText(test).width <= maxWidth) {
+        cur = test;
+      } else {
+        if (cur) lines.push(cur);
+        cur = w;
+      }
+    }
+    if (cur) lines.push(cur);
+    return lines.length ? lines : [""];
+  }
+
+  // === Monats-PNG: Einsatz ===
+  function generateEinsatzPNG() {
+    const outs = computeAllDays();
+    if (!outs.length) {
+      alert("Keine Tage erfasst.");
+      return;
+    }
+
+    const colW = [195, 110, 105, 115, 230, 170, 85];
+    const width = colW.reduce((a,b) => a+b, 0) + 40;
+    const x0 = 20, y0 = 20;
+    const titleFont = "bold 18px sans-serif";
+    const headFont = "bold 10px sans-serif";
+    const cellFont = "11px sans-serif";
+
+    const headers = [
+      "Tag/Datum/\nEreignisnummer",
+      "Zeitraum",
+      "Wochentag\n(06:00–22:00)\nAnzahl Std x 36,-",
+      "Wochentag (22:00–06:00)\n u. Sonn-/Feiertag\nAnzahl Std x 48,-",
+      "Einsatzindikation",
+      "Anmerkung",
+      "Betrag (€)"
+    ];
+
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = width;
+    tmpCanvas.height = 10;
+    const tctx = tmpCanvas.getContext('2d');
+
+    // Kopfzeilenhöhe
+    tctx.font = headFont;
+    let headerLines = 1;
+    headers.forEach((h, i) => {
+      const parts = h.split("\n");
+      let lines = [];
+      parts.forEach(p => {
+        const wl = wrapTextLines(tctx, p, colW[i] - 18);
+        lines = lines.concat(wl);
+      });
+      if (lines.length > headerLines) headerLines = lines.length;
+    });
+    const headLineHeight = 10 + 4;
+    const headerHeight = Math.max(50, 10 + headerLines * headLineHeight + 10);
+
+    const rows = [];
+    const rowHeights = [];
+    let total = 0;
+
+    outs.forEach(out => {
+      out.results.forEach(([i, dayH, nightH, nbDayH, nbNightH, elOn, elH, start, end, nbOn, ev, ind, note, blOn]) => {
+        const label = `${out.dateTable} ${ev}`.trim();
+
+        // Einsatzzeit
+        if (dayH || nightH) {
+          const betrag = dayH * RATE_DAY + nightH * RATE_NIGHT;
+          total += betrag;
+          const timerange = `${pad2(start.getHours())}:${pad2(start.getMinutes())} - ${pad2(end.getHours())}:${pad2(end.getMinutes())} Uhr`;
+          const cells = [
+            label,
+            timerange,
+            dayH ? dayH.toFixed(2).replace('.', ',') : "",
+            nightH ? nightH.toFixed(2).replace('.', ',') : "",
+            ind,
+            note,
+            betrag.toFixed(2).replace('.', ',')
+          ];
+          tctx.font = cellFont;
+          const lineHe = 11 + 4;
+          let maxLines = 1;
+          cells.forEach((c, idx) => {
+            const lines = wrapTextLines(tctx, c, colW[idx] - 20);
+            if (lines.length > maxLines) maxLines = lines.length;
+          });
+          const rowH = Math.max(30, 8 + maxLines * lineHe + 8);
+          rows.push(cells);
+          rowHeights.push(rowH);
+        }
+
+        // Nachbesprechung
+        if (nbDayH || nbNightH) {
+          const betrag = nbDayH * RATE_DAY + nbNightH * RATE_NIGHT;
+          total += betrag;
+          const cells = [
+            label,
+            "NB",
+            nbDayH ? nbDayH.toFixed(2).replace('.', ',') : "",
+            nbNightH ? nbNightH.toFixed(2).replace('.', ',') : "",
+            ind,
+            note,
+            betrag.toFixed(2).replace('.', ',')
+          ];
+          tctx.font = cellFont;
+          const lineHe = 11 + 4;
+          let maxLines = 1;
+          cells.forEach((c, idx) => {
+            const lines = wrapTextLines(tctx, c, colW[idx] - 20);
+            if (lines.length > maxLines) maxLines = lines.length;
+          });
+          const rowH = Math.max(30, 8 + maxLines * lineHe + 8);
+          rows.push(cells);
+          rowHeights.push(rowH);
+        }
+
+        // Einsatzleitung – 0,5 h Tagesstunden
+        if (elOn) {
+          const betrag = EL_HOURS * RATE_DAY;
+          total += betrag;
+          const cells = [
+            label,
+            "EL",
+            EL_HOURS.toFixed(2).replace('.', ','),
+            "",
+            ind,
+            note,
+            betrag.toFixed(2).replace('.', ',')
+          ];
+          tctx.font = cellFont;
+          const lineHe = 11 + 4;
+          let maxLines = 1;
+          cells.forEach((c, idx) => {
+            const lines = wrapTextLines(tctx, c, colW[idx] - 20);
+            if (lines.length > maxLines) maxLines = lines.length;
+          });
+          const rowH = Math.max(30, 8 + maxLines * lineHe + 8);
+          rows.push(cells);
+          rowHeights.push(rowH);
+        }
+      });
+    });
+
+    const footerH = 40;
+    const totalH = y0 + 34 + headerHeight + rowHeights.reduce((a,b)=>a+b,0) + footerH + 20;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = totalH;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0,0,width,totalH);
+    ctx.fillStyle = "#000000";
+
+    // Titel
+    ctx.font = titleFont;
+    ctx.fillText("Einsatz", x0, y0 + 18);
+    let y = y0 + 34;
+
+    // Kopfzeile
+    ctx.font = headFont;
+    let x = x0;
+    headers.forEach((h, i) => {
+      const parts = h.split("\n");
+      let lines = [];
+      parts.forEach(p => {
+        const wl = wrapTextLines(ctx, p, colW[i]-18);
+        lines = lines.concat(wl);
+      });
+      ctx.strokeRect(x, y, colW[i], headerHeight);
+      const lineHe = 10 + 4;
+      const blockH = lines.length * lineHe;
+      let yy = y + (headerHeight - blockH)/2 + lineHe * 0.7;
+      lines.forEach(line => {
+        const w = ctx.measureText(line).width;
+        const xx = x + (colW[i] - w)/2;
+        ctx.fillText(line, xx, yy);
+        yy += lineHe;
+      });
+      x += colW[i];
+    });
+    y += headerHeight;
+
+    // Datenzeilen (vertikal zentriert)
+    ctx.font = cellFont;
+    rows.forEach((cells, idx) => {
+      const hRow = rowHeights[idx];
+      let xx = x0;
+      cells.forEach((cellText, ci) => {
+        ctx.strokeRect(xx, y, colW[ci], hRow);
+        const lines = wrapTextLines(ctx, cellText, colW[ci] - 20);
+        const lineHe = 11 + 4;
+        const blockH = lines.length * lineHe;
+        let yy = y + (hRow - blockH) / 2 + lineHe * 0.7;
+
+        lines.forEach(line => {
+          ctx.fillText(line, xx + 8, yy);
+          yy += lineHe;
+        });
+        xx += colW[ci];
+      });
+      y += hRow;
+    });
+
+    // Fußzeile
+    ctx.font = headFont;
+    const wLabel = colW.slice(0, colW.length-1).reduce((a,b)=>a+b,0);
+    ctx.strokeRect(x0, y, wLabel, footerH);
+    ctx.strokeRect(x0 + wLabel, y, colW[colW.length-1], footerH);
+    ctx.fillText("Rechnungsbetrag", x0+10, y + footerH/2 + 4);
+    const totalStr = total.toFixed(2).replace('.', ',') + " €";
+    const tw = ctx.measureText(totalStr).width;
+    ctx.fillText(totalStr, x0 + wLabel + (colW[colW.length-1]-tw)/2, y + footerH/2 + 4);
+
+    const firstDate = outs[0].jsDate;
+    const fname = `Monat_Einsatz_${firstDate.getFullYear()}-${pad2(firstDate.getMonth()+1)}.png`;
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png');
+    link.download = fname;
+    link.click();
+  }
+
+  // === Monats-PNG: Bereitschaft ===
+  function generateBereitschaftPNG() {
+    const outs = computeAllDays();
+    const outsReady = outs.filter(o => !o.is_bl_day);
+    if (!outsReady.length) {
+      alert("Keine Bereitschaftstage (ohne Blaulicht) im Monat.");
+      return;
+    }
+
+    const colW = [340, 175, 175, 300, 90];
+    const width = colW.reduce((a,b)=>a+b,0) + 40;
+    const x0 = 20, y0 = 20;
+    const titleFont = "bold 18px sans-serif";
+    const headFont = "bold 10px sans-serif";
+    const cellFont = "11px sans-serif";
+
+    const headers = [
+      "Tag/Datum/ Angabe D1 od. D2",
+      "Anzahl Std. Wochentag (€ 2,50)\nBereitschaftsstunden abzüglich Einsatzstunden",
+      "Anzahl Std. Sonn-/Feiertag (€ 4,20)\nBereitschaftsstunden abzüglich Einsatzstunden",
+      "Anmerkung",
+      "Betrag (€)"
+    ];
+
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = width;
+    tmpCanvas.height = 10;
+    const tctx = tmpCanvas.getContext('2d');
+
+    tctx.font = headFont;
+    let headerLines = 1;
+    headers.forEach((h,i) => {
+      const parts = h.split("\n");
+      let lines = [];
+      parts.forEach(p => {
+        const wl = wrapTextLines(tctx, p, colW[i]-18);
+        lines = lines.concat(wl);
+      });
+      if (lines.length > headerLines) headerLines = lines.length;
+    });
+    const headLineHeight = 10 + 4;
+    const headerHeight = Math.max(50, 10 + headerLines*headLineHeight + 10);
+
+    const rows = [];
+    const rowHeights = [];
+    let total = 0;
+
+    outsReady.forEach(out => {
+      const wdHours = out.is_holiday ? 0 : out.ready_hours;
+      const feHours = out.is_holiday ? out.ready_hours : 0;
+      const wdAmount = wdHours * RATE_READY_WD;
+      const feAmount = feHours * RATE_READY_HOL;
+      const amount = wdAmount + feAmount;
+      total += amount;
+      const code = out.ready_mode.startsWith("00:00") ? "D1" : "D2";
+      const label = `${out.dateTable} ${code}`;
+      const cells = [
+        label,
+        wdHours ? wdHours.toFixed(2).replace('.', ',') : "",
+        feHours ? feHours.toFixed(2).replace('.', ',') : "",
+        out.ready_note || "",
+        amount.toFixed(2).replace('.', ',')
+      ];
+      tctx.font = cellFont;
+      const lineHe = 11 + 4;
+      let maxLines = 1;
+      cells.forEach((c, idx) => {
+        const lines = wrapTextLines(tctx, c, colW[idx]-20);
+        if (lines.length > maxLines) maxLines = lines.length;
+      });
+      const rowH = Math.max(30, 8 + maxLines*lineHe + 8);
+      rows.push(cells);
+      rowHeights.push(rowH);
+    });
+
+    const footerH = 40;
+    const totalH = y0 + 34 + headerHeight + rowHeights.reduce((a,b)=>a+b,0) + footerH + 20;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = totalH;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0,0,width,totalH);
+    ctx.fillStyle = "#000000";
+
+    ctx.font = titleFont;
+    ctx.fillText("Bereitschaft", x0, y0+18);
+    let y = y0+34;
+
+    // Kopf
+    ctx.font = headFont;
+    let x = x0;
+    headers.forEach((h,i) => {
+      const parts = h.split("\n");
+      let lines = [];
+      parts.forEach(p => {
+        const wl = wrapTextLines(ctx, p, colW[i]-18);
+        lines = lines.concat(wl);
+      });
+      ctx.strokeRect(x, y, colW[i], headerHeight);
+      const lineHe = 10+4;
+      const blockH = lines.length * lineHe;
+      let yy = y + (headerHeight - blockH)/2 + lineHe * 0.7;
+      lines.forEach(line => {
+        const w = ctx.measureText(line).width;
+        const xx = x + (colW[i]-w)/2;
+        ctx.fillText(line, xx, yy);
+        yy += lineHe;
+      });
+      x += colW[i];
+    });
+    y += headerHeight;
+
+    // Daten (vertikal zentriert)
+    ctx.font = cellFont;
+    rows.forEach((cells, idx) => {
+      const hRow = rowHeights[idx];
+      let xx = x0;
+      cells.forEach((cellText, ci) => {
+        ctx.strokeRect(xx, y, colW[ci], hRow);
+        const lines = wrapTextLines(ctx, cellText, colW[ci]-20);
+        const lineHe = 11+4;
+        const blockH = lines.length * lineHe;
+        let yy = y + (hRow - blockH)/2 + lineHe * 0.7;
+        lines.forEach(line => {
+          ctx.fillText(line, xx+8, yy);
+          yy += lineHe;
+        });
+        xx += colW[ci];
+      });
+      y += hRow;
+    });
+
+    // Fuß
+    ctx.font = headFont;
+    const wLabel = colW.slice(0,colW.length-1).reduce((a,b)=>a+b,0);
+    ctx.strokeRect(x0, y, wLabel, footerH);
+    ctx.strokeRect(x0+wLabel, y, colW[colW.length-1], footerH);
+    ctx.fillText("Rechnungsbetrag", x0+10, y + footerH/2+4);
+    const totalStr = total.toFixed(2).replace('.', ',') + " €";
+    const tw = ctx.measureText(totalStr).width;
+    ctx.fillText(totalStr, x0+wLabel + (colW[colW.length-1]-tw)/2, y + footerH/2+4);
+
+    const firstDate = outsReady[0].jsDate;
+    const fname = `Monat_Bereitschaft_${firstDate.getFullYear()}-${pad2(firstDate.getMonth()+1)}.png`;
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png');
+    link.download = fname;
+    link.click();
+  }
+
+  // === Daten speichern / laden (JSON) ===
+  function collectRawData() {
+    const cards = Array.from(daysContainer.querySelectorAll('.day-card'));
+    const daysData = cards.map(card => {
+      const date = card.querySelector('.inp-date').value.trim();
+      const dayType = card.querySelector('.sel-daytype').value;
+      const readyMode = card.querySelector('.sel-ready').value;
+      const onlyReady = card.querySelector('.chk-only-ready').checked;
+      const readyNote = card.querySelector('.inp-ready-note').value.trim();
+      const blocksEls = card.querySelectorAll('.block');
+      const blocks = Array.from(blocksEls).map(block => ({
+        start: block.querySelector('.b-start').value.trim(),
+        end: block.querySelector('.b-end').value.trim(),
+        nb: block.querySelector('.b-nb').checked,
+        el: block.querySelector('.b-el').checked,
+        bl: block.querySelector('.b-bl').checked,
+        event: block.querySelector('.b-event').value.trim(),
+        ind: block.querySelector('.b-ind').value.trim(),
+        note: block.querySelector('.b-note').value.trim()
+      }));
+      return { date, dayType, readyMode, onlyReady, readyNote, blocks };
+    });
+    return {
+      version: 1,
+      createdAt: new Date().toISOString(),
+      days: daysData
+    };
+  }
+
+  function clearAllDayCards() {
+    daysContainer.innerHTML = "";
+    dayCounter = 0;
+  }
+
+  function loadFromData(data) {
+    if (!data || !Array.isArray(data.days)) {
+      throw new Error("Datei hat kein gültiges Format (keine 'days'-Liste).");
+    }
+    clearAllDayCards();
+    data.days.forEach(day => {
+      let jsDate = new Date();
+      try {
+        if (day.date) jsDate = parseDateDDMMYYYY(day.date);
+      } catch(e) {}
+      const card = createDayCard(jsDate);
+      card.querySelector('.inp-date').value = day.date || "";
+      card.querySelector('.sel-daytype').value = day.dayType || "Werktag";
+      card.querySelector('.sel-ready').value = day.readyMode || "12:00–24:00";
+      const chkOnly = card.querySelector('.chk-only-ready');
+      chkOnly.checked = !!day.onlyReady;
+      if ((day.readyMode || "") === "Blaulicht") {
+        chkOnly.checked = false;
+        chkOnly.disabled = true;
+      }
+      card.querySelector('.inp-ready-note').value = day.readyNote || "";
+      const blocksEls = card.querySelectorAll('.block');
+      (day.blocks || []).forEach((b, idx) => {
+        if (!blocksEls[idx]) return;
+        const el = blocksEls[idx];
+        el.querySelector('.b-start').value = b.start || "";
+        el.querySelector('.b-end').value = b.end || "";
+        el.querySelector('.b-nb').checked = !!b.nb;
+        el.querySelector('.b-el').checked = !!b.el;
+        el.querySelector('.b-bl').checked = !!b.bl;
+        el.querySelector('.b-event').value = b.event || "";
+        el.querySelector('.b-ind').value = b.ind || "";
+        el.querySelector('.b-note').value = b.note || "";
+      });
+    });
+  }
+
+  // === Event-Handler ===
+document.getElementById('btn-save').addEventListener('click', () => {
+  try {
+    const data = collectRawData();
+    if (!data.days.length) {
+      alert("Keine Daten zum Speichern.");
+      return;
+    }
+
+    let fname = "hn-bauer-daten.json";
+
+    try {
+      // Letztes (spätestes) gültiges Datum aus allen Tagen suchen
+      let lastDate = null;
+      data.days.forEach(day => {
+        if (day.date) {
+          try {
+            const d = parseDateDDMMYYYY(day.date);
+            if (!lastDate || d > lastDate) {
+              lastDate = d;
+            }
+          } catch (e) {
+            // ignorieren, wenn ein Datum falsch formatiert ist
+          }
+        }
+      });
+
+      if (lastDate) {
+        const year = lastDate.getFullYear();
+        const monthName = MONTH_NAMES[lastDate.getMonth()];
+        // z.B. hn-bauer_November_2025.json
+        fname = `ABW_HN_${monthName}_${year}.json`;
+      }
+    } catch (e) {
+      // falls etwas schiefgeht, bleibt der Fallback-Name
+    }
+
+    const blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fname;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert("Fehler beim Speichern:\n\n" + e.message);
+  }
+});
+
+
+  document.getElementById('btn-load').addEventListener('click', () => {
+    fileInput.value = "";
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        loadFromData(data);
+        computeAllDaysAndUpdateSummary();
+      } catch(err) {
+        alert("Fehler beim Laden der Datei:\n\n" + err.message);
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  // Ersten Tag automatisch anlegen
+  createDayCard();
+
+  // === Einfacher Passwortschutz (clientseitig) ===
+  const CORRECT_PASSWORD = "Honorarnote";
+  const loginForm = document.getElementById("login-form");
+  const loginPasswordInput = document.getElementById("login-password");
+  const loginError = document.getElementById("login-error");
+  const loginScreen = document.getElementById("login-screen");
+  const appContainer = document.getElementById("app");
+
+  if (loginForm && loginPasswordInput && loginScreen && appContainer) {
+    loginForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      const entered = loginPasswordInput.value || "";
+      if (entered === CORRECT_PASSWORD) {
+        loginError.textContent = "";
+        loginScreen.style.display = "none";
+        appContainer.style.display = "block";
+      } else {
+        loginError.textContent = "Falsches Passwort.";
+        loginPasswordInput.value = "";
+        loginPasswordInput.focus();
+      }
+    });
+  }
+</script>
+</body>
+</html>
