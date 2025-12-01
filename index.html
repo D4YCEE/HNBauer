@@ -168,8 +168,8 @@
       <div class="days-toolbar">
         <button class="btn" id="btn-add-day">Neuer Tag</button>
         <button class="btn secondary" id="btn-compute-all">Alle Tage berechnen</button>
-        <button class="btn secondary" id="btn-einsatz-png">Monatstabelle – Einsatz</button>
-        <button class="btn secondary" id="btn-bereitschaft-png">Monatstabelle – Bereitschaft</button>
+        <button class="btn secondary" id="btn-einsatz-png">Tabelle – Einsatz</button>
+        <button class="btn secondary" id="btn-bereitschaft-png">Tabelle – Bereitschaft</button>
         <button class="btn secondary" id="btn-save">Daten speichern</button>
         <button class="btn secondary" id="btn-load">Daten laden</button>
         <input type="file" id="file-input" accept="application/json" style="display:none;">
@@ -199,11 +199,11 @@
 
   // ==== Hilfsfunktionen ====
   function pad2(n) { return n.toString().padStart(2, '0'); }
-const MONTH_NAMES = [
-  "Januar","Februar","März","April","Mai","Juni",
-  "Juli","August","September","Oktober","November","Dezember"
-];
 
+  const MONTH_NAMES = [
+    "Januar","Februar","März","April","Mai","Juni",
+    "Juli","August","September","Oktober","November","Dezember"
+  ];
 
   function formatDateTable(jsDate) {
     return `${pad2(jsDate.getDate())}.${pad2(jsDate.getMonth()+1)}.${jsDate.getFullYear()}`;
@@ -1035,55 +1035,70 @@ const MONTH_NAMES = [
     });
   }
 
-  // === Event-Handler ===
-document.getElementById('btn-save').addEventListener('click', () => {
-  try {
-    const data = collectRawData();
-    if (!data.days.length) {
-      alert("Keine Daten zum Speichern.");
-      return;
-    }
+  // === Event-Handler für Toolbar ===
+  document.getElementById('btn-add-day').addEventListener('click', () => {
+    createDayCard();
+  });
 
-    let fname = "hn-bauer-daten.json";
+  document.getElementById('btn-compute-all').addEventListener('click', () => {
+    computeAllDaysAndUpdateSummary();
+  });
 
+  document.getElementById('btn-einsatz-png').addEventListener('click', () => {
+    generateEinsatzPNG();
+  });
+
+  document.getElementById('btn-bereitschaft-png').addEventListener('click', () => {
+    generateBereitschaftPNG();
+  });
+
+  document.getElementById('btn-save').addEventListener('click', () => {
     try {
-      // Letztes (spätestes) gültiges Datum aus allen Tagen suchen
-      let lastDate = null;
-      data.days.forEach(day => {
-        if (day.date) {
-          try {
-            const d = parseDateDDMMYYYY(day.date);
-            if (!lastDate || d > lastDate) {
-              lastDate = d;
-            }
-          } catch (e) {
-            // ignorieren, wenn ein Datum falsch formatiert ist
-          }
-        }
-      });
-
-      if (lastDate) {
-        const year = lastDate.getFullYear();
-        const monthName = MONTH_NAMES[lastDate.getMonth()];
-        // z.B. hn-bauer_November_2025.json
-        fname = `ABW_HN_${monthName}_${year}.json`;
+      const data = collectRawData();
+      if (!data.days.length) {
+        alert("Keine Daten zum Speichern.");
+        return;
       }
+
+      let fname = "hn-bauer-daten.json";
+
+      try {
+        // Letztes (spätestes) gültiges Datum aus allen Tagen suchen
+        let lastDate = null;
+        data.days.forEach(day => {
+          if (day.date) {
+            try {
+              const d = parseDateDDMMYYYY(day.date);
+              if (!lastDate || d > lastDate) {
+                lastDate = d;
+              }
+            } catch (e) {
+              // ignorieren, wenn ein Datum falsch formatiert ist
+            }
+          }
+        });
+
+        if (lastDate) {
+          const year = lastDate.getFullYear();
+          const monthName = MONTH_NAMES[lastDate.getMonth()];
+          // z.B. ABW_HN_November_2025.json
+          fname = `ABW_HN_${monthName}_${year}.json`;
+        }
+      } catch (e) {
+        // falls etwas schiefgeht, bleibt der Fallback-Name
+      }
+
+      const blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fname;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch (e) {
-      // falls etwas schiefgeht, bleibt der Fallback-Name
+      alert("Fehler beim Speichern:\n\n" + e.message);
     }
-
-    const blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fname;
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (e) {
-    alert("Fehler beim Speichern:\n\n" + e.message);
-  }
-});
-
+  });
 
   document.getElementById('btn-load').addEventListener('click', () => {
     fileInput.value = "";
@@ -1106,61 +1121,63 @@ document.getElementById('btn-save').addEventListener('click', () => {
     reader.readAsText(file);
   });
 
-  // Ersten Tag automatisch anlegen
+  // Ersten Tag automatisch anlegen (unsichtbar, bis Login ok)
   createDayCard();
 
-const PASSWORD_HASH = "94fe49202733012008370645f8d244e96964a6876aa3c439d6956868082bc938";
+  // === Login-Logik ===
+  const PASSWORD_HASH = "94fe49202733012008370645f8d244e96964a6876aa3c439d6956868082bc938";
 
-const loginForm = document.getElementById("login-form");
-const loginPasswordInput = document.getElementById("login-password");
-const loginError = document.getElementById("login-error");
-const loginScreen = document.getElementById("login-screen");
-const appContainer = document.getElementById("app");
+  const loginForm = document.getElementById("login-form");
+  const loginPasswordInput = document.getElementById("login-password");
+  const loginError = document.getElementById("login-error");
+  const loginScreen = document.getElementById("login-screen");
+  const appContainer = document.getElementById("app");
 
-// Hilfsfunktion: SHA-256 mit Web Crypto API
-async function sha256Hex(str) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(str);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-if (loginForm && loginPasswordInput && loginScreen && appContainer) {
-  // Falls der Browser kein crypto.subtle unterstützt
-  if (!window.crypto || !crypto.subtle) {
-    loginError.textContent = "Dieser Browser unterstützt den Login nicht (kein crypto.subtle).";
-    loginPasswordInput.disabled = true;
-  } else {
-    loginForm.addEventListener("submit", async function (e) {
-      e.preventDefault();
-
-      // Eventuelle Leerzeichen vorne/hinten entfernen
-      const entered = (loginPasswordInput.value || "").trim();
-
-      try {
-        const hash = await sha256Hex(entered);
-
-        console.log("Eingegebener Hash:", hash);
-
-        if (hash === PASSWORD_HASH) {
-          // korrektes Passwort
-          loginError.textContent = "";
-          loginScreen.style.display = "none";
-          appContainer.style.display = "block";
-        } else {
-          // falsches Passwort
-          loginError.textContent = "Falsches Passwort.";
-          loginPasswordInput.value = "";
-          loginPasswordInput.focus();
-        }
-      } catch (err) {
-        console.error("Hash-Fehler:", err);
-        loginError.textContent = "Login momentan nicht möglich.";
-      }
-    });
+  // Hilfsfunktion: SHA-256 mit Web Crypto API
+  async function sha256Hex(str) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
   }
-}
+
+  if (loginForm && loginPasswordInput && loginScreen && appContainer) {
+    // Falls der Browser kein crypto.subtle unterstützt
+    if (!window.crypto || !crypto.subtle) {
+      loginError.textContent = "Dieser Browser unterstützt den Login nicht (kein crypto.subtle).";
+      loginPasswordInput.disabled = true;
+    } else {
+      loginForm.addEventListener("submit", async function (e) {
+        e.preventDefault();
+
+        // Eventuelle Leerzeichen vorne/hinten entfernen
+        const entered = (loginPasswordInput.value || "").trim();
+
+        try {
+          const hash = await sha256Hex(entered);
+
+          console.log("Eingegebener Hash:", hash);
+
+          if (hash === PASSWORD_HASH) {
+            // korrektes Passwort
+            loginError.textContent = "";
+            loginScreen.style.display = "none";
+            appContainer.style.display = "block";
+          } else {
+            // falsches Passwort
+            loginError.textContent = "Falsches Passwort.";
+            loginPasswordInput.value = "";
+            loginPasswordInput.focus();
+          }
+        } catch (err) {
+          console.error("Hash-Fehler:", err);
+          loginError.textContent = "Login momentan nicht möglich.";
+        }
+      });
+    }
+  }
 </script>
 </body>
 </html>
+
