@@ -1,3 +1,5 @@
+// _worker.js – Basic Auth für deine gesamte Pages-Site
+
 export default {
   async fetch(request, env) {
     const expectedUser = env.BASIC_USER;
@@ -7,17 +9,20 @@ export default {
 
     if (authHeader.startsWith("Basic ")) {
       try {
-        const base64 = authHeader.slice(6);
-        const decoded = atob(base64);
+        const base64 = authHeader.slice(6);        // alles nach "Basic "
+        const decoded = atob(base64);              // z.B. "user:pass"
         const [user, pass] = decoded.split(":");
 
         if (user === expectedUser && pass === expectedPass) {
-          // Seite normal ausliefern
+          // Login korrekt → statische Dateien ausliefern
           return env.ASSETS.fetch(request);
         }
-      } catch (err) {}
+      } catch (err) {
+        // Ignorieren, fällt unten auf 401 zurück
+      }
     }
 
+    // Kein oder falscher Login → Browser-Popup anzeigen
     return new Response("Unauthorized", {
       status: 401,
       headers: {
@@ -27,3 +32,4 @@ export default {
     });
   }
 };
+
