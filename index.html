@@ -1109,7 +1109,9 @@ document.getElementById('btn-save').addEventListener('click', () => {
   // Ersten Tag automatisch anlegen
   createDayCard();
 
-// === Passwortschutz mit Hash (kein Klartext-Passwort im Code) ===
+// === Passwortschutz mit SHA-256-Hash (kein Klartext-Passwort im Code) ===
+
+// SHA-256-Hash deines Passworts "Honorarnote123!"
 const PASSWORD_HASH = "94fe49202733012008370645f8d244e96964a6876aa3c439d6956868082bc938";
 
 const loginForm = document.getElementById("login-form");
@@ -1128,29 +1130,42 @@ async function sha256Hex(str) {
 }
 
 if (loginForm && loginPasswordInput && loginScreen && appContainer) {
-  loginForm.addEventListener("submit", async function (e) {
-    e.preventDefault();
-    const entered = loginPasswordInput.value || "";
+  // Falls der Browser kein crypto.subtle unterstützt
+  if (!window.crypto || !crypto.subtle) {
+    loginError.textContent = "Dieser Browser unterstützt den Login nicht (kein crypto.subtle).";
+    loginPasswordInput.disabled = true;
+  } else {
+    loginForm.addEventListener("submit", async function (e) {
+      e.preventDefault();
 
-    try {
-      const hash = await sha256Hex(entered);
-      if (hash === PASSWORD_HASH) {
-        // korrektes Passwort
-        loginError.textContent = "";
-        loginScreen.style.display = "none";
-        appContainer.style.display = "block";
-      } else {
-        // falsches Passwort
-        loginError.textContent = "Falsches Passwort.";
-        loginPasswordInput.value = "";
-        loginPasswordInput.focus();
+      // Eventuelle Leerzeichen vorne/hinten entfernen
+      const entered = (loginPasswordInput.value || "").trim();
+
+      try {
+        const hash = await sha256Hex(entered);
+
+        // DEBUG: temporär, falls du prüfen willst, ob der Hash stimmt
+        // console.log("Eingegebener Hash:", hash);
+
+        if (hash === PASSWORD_HASH) {
+          // korrektes Passwort
+          loginError.textContent = "";
+          loginScreen.style.display = "none";
+          appContainer.style.display = "block";
+        } else {
+          // falsches Passwort
+          loginError.textContent = "Falsches Passwort.";
+          loginPasswordInput.value = "";
+          loginPasswordInput.focus();
+        }
+      } catch (err) {
+        console.error("Hash-Fehler:", err);
+        loginError.textContent = "Login momentan nicht möglich.";
       }
-    } catch (err) {
-      console.error("Hash-Fehler:", err);
-      loginError.textContent = "Login momentan nicht möglich.";
-    }
-  });
+    });
+  }
 }
+
 
 
 </script>
