@@ -1109,29 +1109,52 @@ document.getElementById('btn-save').addEventListener('click', () => {
   // Ersten Tag automatisch anlegen
   createDayCard();
 
-  // === Einfacher Passwortschutz (clientseitig) ===
-  const CORRECT_PASSWORD = "Honorarnote";
-  const loginForm = document.getElementById("login-form");
-  const loginPasswordInput = document.getElementById("login-password");
-  const loginError = document.getElementById("login-error");
-  const loginScreen = document.getElementById("login-screen");
-  const appContainer = document.getElementById("app");
+// === Passwortschutz mit Hash (kein Klartext-Passwort im Code) ===
 
-  if (loginForm && loginPasswordInput && loginScreen && appContainer) {
-    loginForm.addEventListener("submit", function (e) {
-      e.preventDefault();
-      const entered = loginPasswordInput.value || "";
-      if (entered === CORRECT_PASSWORD) {
+// SHA-256-Hash deines Passworts "Honorarnote":
+// Wenn du ein anderes Passwort willst, musst du nur den Hash austauschen.
+const PASSWORD_HASH = "5cdd1d7b8822edcff757b9572787c87b7911acdf17e43f9d68b19fa5c970dd51";
+
+const loginForm = document.getElementById("login-form");
+const loginPasswordInput = document.getElementById("login-password");
+const loginError = document.getElementById("login-error");
+const loginScreen = document.getElementById("login-screen");
+const appContainer = document.getElementById("app");
+
+// Hilfsfunktion: SHA-256 mit Web Crypto API
+async function sha256Hex(str) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+if (loginForm && loginPasswordInput && loginScreen && appContainer) {
+  loginForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const entered = loginPasswordInput.value || "";
+
+    try {
+      const hash = await sha256Hex(entered);
+      if (hash === PASSWORD_HASH) {
+        // korrektes Passwort
         loginError.textContent = "";
         loginScreen.style.display = "none";
         appContainer.style.display = "block";
       } else {
+        // falsches Passwort
         loginError.textContent = "Falsches Passwort.";
         loginPasswordInput.value = "";
         loginPasswordInput.focus();
       }
-    });
-  }
+    } catch (err) {
+      console.error("Hash-Fehler:", err);
+      loginError.textContent = "Login momentan nicht möglich.";
+    }
+  });
+}
+
 </script>
 </body>
 </html>
