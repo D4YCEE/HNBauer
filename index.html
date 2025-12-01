@@ -1142,8 +1142,7 @@ if (loginForm && loginPasswordInput && loginScreen && appContainer) {
       try {
         const hash = await sha256Hex(entered);
 
-        // DEBUG: temporär, falls du prüfen willst, ob der Hash stimmt
-        // console.log("Eingegebener Hash:", hash);
+        console.log("Eingegebener Hash:", hash);
 
         if (hash === PASSWORD_HASH) {
           // korrektes Passwort
