@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+^<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -168,8 +168,8 @@
       <div class="days-toolbar">
         <button class="btn" id="btn-add-day">Neuer Tag</button>
         <button class="btn secondary" id="btn-compute-all">Alle Tage berechnen</button>
-        <button class="btn secondary" id="btn-einsatz-png">Tabelle – Einsatz</button>
-        <button class="btn secondary" id="btn-bereitschaft-png">Tabelle – Bereitschaft</button>
+        <button class="btn secondary" id="btn-einsatz-png">Monatstabelle – Einsatz</button>
+        <button class="btn secondary" id="btn-bereitschaft-png">Monatstabelle – Bereitschaft</button>
         <button class="btn secondary" id="btn-save">Daten speichern</button>
         <button class="btn secondary" id="btn-load">Daten laden</button>
         <input type="file" id="file-input" accept="application/json" style="display:none;">
@@ -1104,23 +1104,6 @@ document.getElementById('btn-save').addEventListener('click', () => {
       }
     };
     reader.readAsText(file);
-  });
-
-    // Toolbar-Buttons verdrahten
-  document.getElementById('btn-add-day').addEventListener('click', () => {
-    createDayCard();
-  });
-
-  document.getElementById('btn-compute-all').addEventListener('click', () => {
-    computeAllDaysAndUpdateSummary();
-  });
-
-  document.getElementById('btn-einsatz-png').addEventListener('click', () => {
-    generateEinsatzPNG();
-  });
-
-  document.getElementById('btn-bereitschaft-png').addEventListener('click', () => {
-    generateBereitschaftPNG();
   });
 
   // Ersten Tag automatisch anlegen
