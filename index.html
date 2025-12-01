@@ -1106,9 +1106,25 @@ document.getElementById('btn-save').addEventListener('click', () => {
     reader.readAsText(file);
   });
 
+    // Toolbar-Buttons verdrahten
+  document.getElementById('btn-add-day').addEventListener('click', () => {
+    createDayCard();
+  });
+
+  document.getElementById('btn-compute-all').addEventListener('click', () => {
+    computeAllDaysAndUpdateSummary();
+  });
+
+  document.getElementById('btn-einsatz-png').addEventListener('click', () => {
+    generateEinsatzPNG();
+  });
+
+  document.getElementById('btn-bereitschaft-png').addEventListener('click', () => {
+    generateBereitschaftPNG();
+  });
+
   // Ersten Tag automatisch anlegen
   createDayCard();
-
 
 const PASSWORD_HASH = "94fe49202733012008370645f8d244e96964a6876aa3c439d6956868082bc938";
 
@@ -1162,9 +1178,6 @@ if (loginForm && loginPasswordInput && loginScreen && appContainer) {
     });
   }
 }
-
-
-
 </script>
 </body>
 </html>
