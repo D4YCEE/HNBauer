@@ -773,7 +773,7 @@
     return lines.length ? lines : [""];
   }
 
-  // === Monats-PNG: Einsatz ===
+  // === Monats-PNG: Einsatz (NB zusammengefasst pro Tag) ===
   function generateEinsatzPNG() {
     const outs = computeAllDays();
     if (!outs.length) {
@@ -823,6 +823,13 @@
     let total = 0;
 
     outs.forEach(out => {
+      // NB pro Tag aggregieren
+      let nbDayTotal = 0;
+      let nbNightTotal = 0;
+      let nbEv = "";
+      let nbInd = "";
+      let nbNote = "";
+
       out.results.forEach(([i, dayH, nightH, nbDayH, nbNightH, elOn, elH, start, end, nbOn, ev, ind, note, blOn]) => {
         const label = `${out.dateTable} ${ev}`.trim();
 
@@ -852,32 +859,16 @@
           rowHeights.push(rowH);
         }
 
-        // Nachbesprechung
+        // NB nur aufsummieren (noch keine Zeile erzeugen)
         if (nbDayH || nbNightH) {
-          const betrag = nbDayH * RATE_DAY + nbNightH * RATE_NIGHT;
-          total += betrag;
-          const cells = [
-            label,
-            "NB",
-            nbDayH ? nbDayH.toFixed(2).replace('.', ',') : "",
-            nbNightH ? nbNightH.toFixed(2).replace('.', ',') : "",
-            ind,
-            note,
-            betrag.toFixed(2).replace('.', ',')
-          ];
-          tctx.font = cellFont;
-          const lineHe = 11 + 4;
-          let maxLines = 1;
-          cells.forEach((c, idx) => {
-            const lines = wrapTextLines(tctx, c, colW[idx] - 20);
-            if (lines.length > maxLines) maxLines = lines.length;
-          });
-          const rowH = Math.max(30, 8 + maxLines * lineHe + 8);
-          rows.push(cells);
-          rowHeights.push(rowH);
+          nbDayTotal += nbDayH;
+          nbNightTotal += nbNightH;
+          if (!nbEv && ev) nbEv = ev;
+          if (!nbInd && ind) nbInd = ind;
+          if (!nbNote && note) nbNote = note;
         }
 
-        // Einsatzleitung – 0,5 h Tagesstunden
+        // Einsatzleitung – 0,5 h Tagesstunden (pro Block)
         if (elOn) {
           const betrag = EL_HOURS * RATE_DAY;
           total += betrag;
@@ -902,6 +893,32 @@
           rowHeights.push(rowH);
         }
       });
+
+      // Jetzt EINE zusammengefasste NB-Zeile pro Tag erzeugen (falls es NB-Stunden gibt)
+      if (nbDayTotal || nbNightTotal) {
+        const labelNB = `${out.dateTable} ${nbEv}`.trim();
+        const betragNB = nbDayTotal * RATE_DAY + nbNightTotal * RATE_NIGHT;
+        total += betragNB;
+        const cellsNB = [
+          labelNB,
+          "NB",
+          nbDayTotal ? nbDayTotal.toFixed(2).replace('.', ',') : "",
+          nbNightTotal ? nbNightTotal.toFixed(2).replace('.', ',') : "",
+          nbInd,
+          nbNote,
+          betragNB.toFixed(2).replace('.', ',')
+        ];
+        tctx.font = cellFont;
+        const lineHeNB = 11 + 4;
+        let maxLinesNB = 1;
+        cellsNB.forEach((c, idx) => {
+          const lines = wrapTextLines(tctx, c, colW[idx] - 20);
+          if (lines.length > maxLinesNB) maxLinesNB = lines.length;
+        });
+        const rowHNB = Math.max(30, 8 + maxLinesNB * lineHeNB + 8);
+        rows.push(cellsNB);
+        rowHeights.push(rowHNB);
+      }
     });
 
     const footerH = 40;
@@ -969,12 +986,13 @@
     // Fußzeile
     ctx.font = headFont;
     const wLabel = colW.slice(0, colW.length-1).reduce((a,b)=>a+b,0);
-    ctx.strokeRect(x0, y, wLabel, footerH);
-    ctx.strokeRect(x0 + wLabel, y, colW[colW.length-1], footerH);
-    ctx.fillText("Rechnungsbetrag", x0+10, y + footerH/2 + 4);
+    const footerY = y;
+    ctx.strokeRect(x0, footerY, wLabel, footerH);
+    ctx.strokeRect(x0 + wLabel, footerY, colW[colW.length-1], footerH);
+    ctx.fillText("Rechnungsbetrag", x0+10, footerY + footerH/2 + 4);
     const totalStr = total.toFixed(2).replace('.', ',') + " €";
     const tw = ctx.measureText(totalStr).width;
-    ctx.fillText(totalStr, x0 + wLabel + (colW[colW.length-1]-tw)/2, y + footerH/2 + 4);
+    ctx.fillText(totalStr, x0 + wLabel + (colW[colW.length-1]-tw)/2, footerY + footerH/2 + 4);
 
     const firstDate = outs[0].jsDate;
     const fname = `Monat_Einsatz_${firstDate.getFullYear()}-${pad2(firstDate.getMonth()+1)}.png`;
@@ -1122,12 +1140,13 @@
     // Fuß
     ctx.font = headFont;
     const wLabel = colW.slice(0,colW.length-1).reduce((a,b)=>a+b,0);
-    ctx.strokeRect(x0, y, wLabel, footerH);
-    ctx.strokeRect(x0+wLabel, y, colW[colW.length-1], footerH);
-    ctx.fillText("Rechnungsbetrag", x0+10, y + footerH/2+4);
+    const footerY = y;
+    ctx.strokeRect(x0, footerY, wLabel, footerH);
+    ctx.strokeRect(x0+wLabel, footerY, colW[colW.length-1], footerH);
+    ctx.fillText("Rechnungsbetrag", x0+10, footerY + footerH/2+4);
     const totalStr = total.toFixed(2).replace('.', ',') + " €";
     const tw = ctx.measureText(totalStr).width;
-    ctx.fillText(totalStr, x0+wLabel + (colW[colW.length-1]-tw)/2, y + footerH/2+4);
+    ctx.fillText(totalStr, x0+wLabel + (colW[colW.length-1]-tw)/2, footerY + footerH/2+4);
 
     const firstDate = outsReady[0].jsDate;
     const fname = `Monat_Bereitschaft_${firstDate.getFullYear()}-${pad2(firstDate.getMonth()+1)}.png`;
@@ -1356,5 +1375,3 @@
 </script>
 </body>
 </html>
-
-
