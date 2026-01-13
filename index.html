@@ -125,6 +125,10 @@
     .danger:hover {
       background: #880000;
     }
+    .debug-line {
+      font-size: 0.78rem;
+      opacity: 0.75;
+    }
     @media (max-width: 700px) {
       .field-row {
         flex-direction: column;
@@ -185,7 +189,7 @@
   </div>
 
 <script>
-  // === Konstanten (wie in v7.8) ===
+  // === Konstanten ===
   const RATE_DAY = 36.0;
   const RATE_NIGHT = 48.0;
   const RATE_READY_WD = 2.5;
@@ -197,13 +201,17 @@
   const summaryBox = document.getElementById('summary');
   const fileInput = document.getElementById('file-input');
 
-  // ==== Hilfsfunktionen ====
   function pad2(n) { return n.toString().padStart(2, '0'); }
 
   const MONTH_NAMES = [
     "Januar","Februar","März","April","Mai","Juni",
     "Juli","August","September","Oktober","November","Dezember"
   ];
+
+  // Rundung auf Viertelstunden
+  function roundToQuarterHours(h) {
+    return Math.round(h * 4) / 4;  // 0.00, 0.25, 0.50, 0.75 ...
+  }
 
   function formatDateTable(jsDate) {
     return `${pad2(jsDate.getDate())}.${pad2(jsDate.getMonth()+1)}.${jsDate.getFullYear()}`;
@@ -336,6 +344,7 @@
         <button class="btn secondary btn-calc-day">Diesen Tag berechnen</button>
         <button class="btn danger btn-remove-day">Tag entfernen</button>
         <span class="day-result" style="font-size:0.85rem; opacity:0.8;"></span>
+        <div class="debug-line"></div>
       </div>
     `;
 
@@ -358,6 +367,20 @@
         const out = computeDay(card);
         card.querySelector('.day-result').textContent =
           `Summe Einsatzstunden: ${out.sum_hours.toFixed(2)} h (ohne EL) | Bereitschaft: ${out.ready_hours.toFixed(2)} h | Gesamt: ${out.grand_total.toFixed(2)} €`;
+
+        // Debug-Zeile
+        const dbg = card.querySelector('.debug-line');
+        if (out.debug_base_ready_hours !== null) {
+          const einsHz = (out.debug_deduct_einsatz_min / 60).toFixed(2);
+          const nbHz = (out.debug_deduct_nb_min / 60).toFixed(2);
+          const restHz = (out.debug_remaining_ready_min / 60).toFixed(2);
+          dbg.textContent =
+            `Debug Bereitschaft: Basis ${out.debug_base_ready_hours.toFixed(2)} h, ` +
+            `Abzug Einsätze ${einsHz} h, Abzug NB ${nbHz} h, verbleibend ${restHz} h (vor Rundung).`;
+        } else {
+          dbg.textContent = '';
+        }
+
       } catch (e) {
         alert(`Fehler im Tag ${dayCounter}:\n\n` + e.message);
       }
@@ -375,7 +398,7 @@
     return card;
   }
 
-  // === Kernberechnung eines Tages ===
+  // === Kernberechnung eines Tages mit NB-Speziallogik und Viertelstunden ===
   function computeDay(card) {
     const dateStr = card.querySelector('.inp-date').value;
     const dayType = card.querySelector('.sel-daytype').value;
@@ -389,39 +412,64 @@
     let readyStart = null, readyEnd = null;
     if (!isBLDay) {
       if (readyMode.startsWith("00:00")) {
+        // D1: 00:00–12:00
         readyStart = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate(), 0, 0, 0);
-        readyEnd   = new Date(readyStart.getTime() + 12*60*60*1000);
-      } else { // 12:00–24:00
+        readyEnd   = new Date(readyStart.getTime() + 12 * 60 * 60 * 1000);
+      } else {
+        // D2: 12:00–24:00 (00:00 nächster Tag)
         readyStart = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate(), 12, 0, 0);
-        const dayAfter = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate()+1);
+        const dayAfter = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate() + 1);
         readyEnd = dayAfter;
       }
     }
 
-    let totals = { day:0, night:0, nb_day:0, nb_night:0, el:0 };
+    let totals = { day: 0, night: 0, nb_day: 0, nb_night: 0, el: 0 };
     let totalDeductMin = 0;
+    let deductFromReadyEinsatzMin = 0;
+    let deductFromReadyNBMin = 0;
     let results = [];
     let anyBL = false;
     let anyEntries = false;
 
-    const blocks = card.querySelectorAll('.block');
+    const blocks = Array.from(card.querySelectorAll('.block'));
+    let blockMeta = [];
+
     if (!onlyReady) {
-      let idx = 0;
-      blocks.forEach(block => {
-        idx++;
-        const sStr = block.querySelector('.b-start').value.trim();
-        const eStr = block.querySelector('.b-end').value.trim();
-        const nbOn = block.querySelector('.b-nb').checked;
-        const elOn = block.querySelector('.b-el').checked;
-        const blOn = block.querySelector('.b-bl').checked;
-        const ev = block.querySelector('.b-event').value.trim();
-        const ind = block.querySelector('.b-ind').value.trim();
-        const note = block.querySelector('.b-note').value.trim();
+      // 1. Einsätze einlesen (ohne NB-Berechnung)
+      blocks.forEach((blockEl, idx0) => {
+        const idx = idx0 + 1;
+        const sStr = blockEl.querySelector('.b-start').value.trim();
+        const eStr = blockEl.querySelector('.b-end').value.trim();
+        const nbOn = blockEl.querySelector('.b-nb').checked;
+        const elOn = blockEl.querySelector('.b-el').checked;
+        const blOn = blockEl.querySelector('.b-bl').checked;
+        const ev = blockEl.querySelector('.b-event').value.trim();
+        const ind = blockEl.querySelector('.b-ind').value.trim();
+        const note = blockEl.querySelector('.b-note').value.trim();
 
         if (!sStr && !eStr) {
-          results.push([idx,0,0,0,0,elOn,0,null,null,nbOn,ev,ind,note,blOn]);
+          const elH = elOn ? EL_HOURS : 0;
+          totals.el += elH;
+          blockMeta.push({
+            idx,
+            empty: true,
+            nbOn,
+            elOn,
+            blOn,
+            ev,
+            ind,
+            note,
+            start: null,
+            end: null,
+            dayH: 0,
+            nightH: 0,
+            nbDayH: 0,
+            nbNightH: 0,
+            elH
+          });
           return;
         }
+
         anyEntries = true;
         if (blOn) anyBL = true;
 
@@ -430,61 +478,181 @@
         let start = dtCombineDateTime(jsDate, sHH);
         let end   = dtCombineDateTime(jsDate, eHH);
         if (end <= start) {
-          end = new Date(end.getTime() + 24*60*60*1000); // über Mitternacht
+          end = new Date(end.getTime() + 24 * 60 * 60 * 1000); // über Mitternacht
         }
 
         const { dayMin, nightMin } = splitDayNightMinutes(start, end, isHoliday);
-        const dayH = dayMin/60.0;
-        const nightH = nightMin/60.0;
+        const dayH_raw = dayMin / 60.0;
+        const nightH_raw = nightMin / 60.0;
 
-        let nbDayH = 0, nbNightH = 0;
-        if (nbOn) {
-          const nbStart = new Date(end.getTime());
-          const nbEnd = new Date(end.getTime() + NB_MINUTES*60000);
-          const nbSplit = splitDayNightMinutes(nbStart, nbEnd, isHoliday);
-          nbDayH = nbSplit.dayMin/60.0;
-          nbNightH = nbSplit.nightMin/60.0;
-        }
-
+        const dayH = roundToQuarterHours(dayH_raw);
+        const nightH = roundToQuarterHours(nightH_raw);
         const elH = elOn ? EL_HOURS : 0;
 
         totals.day += dayH;
         totals.night += nightH;
-        totals.nb_day += nbDayH;
-        totals.nb_night += nbNightH;
         totals.el += elH;
 
+        // Einsatzzeiten verringern Bereitschaft
         if (!isBLDay && !blOn && readyStart && readyEnd) {
-          totalDeductMin += overlapMinutes(start, end, readyStart, readyEnd);
-          if (nbOn) {
-            const nbStart = new Date(end.getTime());
-            const nbEnd = new Date(end.getTime() + NB_MINUTES*60000);
-            totalDeductMin += overlapMinutes(nbStart, nbEnd, readyStart, readyEnd);
+          const ded = overlapMinutes(start, end, readyStart, readyEnd);
+          totalDeductMin += ded;
+          deductFromReadyEinsatzMin += ded;
+        }
+
+        blockMeta.push({
+          idx,
+          empty: false,
+          nbOn,
+          elOn,
+          blOn,
+          ev,
+          ind,
+          note,
+          start,
+          end,
+          dayH,
+          nightH,
+          nbDayH: 0,
+          nbNightH: 0,
+          elH
+        });
+      });
+
+      // 2. Hilfe: nächster Einsatzstart nach einem Block
+      function findNextStart(metaIndex) {
+        const cur = blockMeta[metaIndex];
+        if (!cur || !cur.end) return null;
+        let next = null;
+        blockMeta.forEach((b, idx) => {
+          if (idx === metaIndex) return;
+          if (b.empty || !b.start || !b.end) return;
+          if (b.start > cur.end) {
+            if (!next || b.start < next) next = b.start;
+          }
+        });
+        return next;
+      }
+
+      // 3. Basisstart für NBs, die erst NACH der Bereitschaft stattfinden
+      let lastEnd = null;
+      blockMeta.forEach(b => {
+        if (b.empty || !b.end) return;
+        if (!lastEnd || b.end > lastEnd) lastEnd = b.end;
+      });
+
+      let nbOutsideCursor = null;
+      if (readyEnd) {
+        nbOutsideCursor = new Date(readyEnd.getTime());
+      } else if (lastEnd) {
+        nbOutsideCursor = new Date(lastEnd.getTime());
+      }
+
+      // 4. Nachbesprechungen platzieren (innerhalb oder außerhalb der Bereitschaft)
+      blockMeta.forEach((b, metaIndex) => {
+        if (!b.nbOn || !b.end) return;
+
+        const nbDurationMs = NB_MINUTES * 60000;
+        let nbStart, nbEnd;
+
+        const nextStart = findNextStart(metaIndex);
+        let windowEnd = null;
+
+        if (readyEnd) windowEnd = readyEnd;
+        if (nextStart && (!windowEnd || nextStart < windowEnd)) {
+          windowEnd = nextStart;
+        }
+
+        let fitsInsideReady = false;
+        if (windowEnd) {
+          if (b.end.getTime() + nbDurationMs <= windowEnd.getTime()) {
+            fitsInsideReady = true;
           }
         }
 
-        results.push([idx,dayH,nightH,nbDayH,nbNightH,elOn,elH,start,end,nbOn,ev,ind,note,blOn]);
+        if (!isBLDay && !b.blOn && readyStart && readyEnd && fitsInsideReady) {
+          // NB direkt nach dem Einsatz innerhalb der Bereitschaft
+          nbStart = new Date(b.end.getTime());
+          nbEnd   = new Date(nbStart.getTime() + nbDurationMs);
+          const dedNB = overlapMinutes(nbStart, nbEnd, readyStart, readyEnd);
+          totalDeductMin += dedNB;
+          deductFromReadyNBMin += dedNB;
+        } else {
+          // NB passt nicht innerhalb der Bereitschaft -> nach der Bereitschaft
+          if (!nbOutsideCursor) {
+            nbOutsideCursor = new Date(b.end.getTime());
+          }
+          nbStart = new Date(nbOutsideCursor.getTime());
+          nbEnd   = new Date(nbOutsideCursor.getTime() + nbDurationMs);
+          nbOutsideCursor = new Date(nbEnd.getTime());
+          // kein Abzug von Bereitschaft
+        }
+
+        // Vergütung der NB (immer, egal ob innerhalb oder außerhalb der Bereitschaft)
+        const nbSplit = splitDayNightMinutes(nbStart, nbEnd, isHoliday);
+        const nbDayH_raw = nbSplit.dayMin / 60.0;
+        const nbNightH_raw = nbSplit.nightMin / 60.0;
+        const nbDayH = roundToQuarterHours(nbDayH_raw);
+        const nbNightH = roundToQuarterHours(nbNightH_raw);
+
+        totals.nb_day += nbDayH;
+        totals.nb_night += nbNightH;
+
+        b.nbDayH += nbDayH;
+        b.nbNightH += nbNightH;
+      });
+
+      // 5. results-Array aus blockMeta befüllen
+      blockMeta.forEach(b => {
+        results.push([
+          b.idx,
+          b.dayH || 0,
+          b.nightH || 0,
+          b.nbDayH || 0,
+          b.nbNightH || 0,
+          b.elOn,
+          b.elH || 0,
+          b.start,
+          b.end,
+          b.nbOn,
+          b.ev,
+          b.ind,
+          b.note,
+          b.blOn
+        ]);
       });
     }
 
+    // 6. Bereitschaftsstunden (in Viertelstunden)
     let readyHours = 0;
+    let baseReadyMin = null;
+    let remainingReadyMin = null;
+
     if (!isBLDay) {
       if (onlyReady) {
         readyHours = 12.0;
+        baseReadyMin = 12 * 60;
+        remainingReadyMin = 12 * 60;
       } else if (readyStart && readyEnd) {
-        const base = (readyEnd.getTime() - readyStart.getTime())/60000; // 720
-        const remaining = Math.max(0, base - totalDeductMin);
-        readyHours = remaining/60.0;
+        baseReadyMin = (readyEnd.getTime() - readyStart.getTime()) / 60000;
+        const remaining = Math.max(0, baseReadyMin - totalDeductMin);
+        remainingReadyMin = remaining;
+        const readyHours_raw = remaining / 60.0;
+        readyHours = roundToQuarterHours(readyHours_raw);
       }
     } else {
       readyHours = 0;
+      baseReadyMin = null;
+      remainingReadyMin = null;
     }
 
+    // 7. Beträge
     const einsatzAmount =
       totals.day * RATE_DAY +
       totals.night * RATE_NIGHT +
       totals.nb_day * RATE_DAY +
       totals.nb_night * RATE_NIGHT;
+
     const elAmount = totals.el * RATE_DAY;
 
     let readyAmount = 0;
@@ -515,7 +683,12 @@
       amount_ready: readyAmount,
       grand_total: grandTotal,
       any_bl: anyBL,
-      any_entries: anyEntries
+      any_entries: anyEntries,
+      // Debug-Infos:
+      debug_base_ready_hours: baseReadyMin !== null ? (baseReadyMin / 60.0) : null,
+      debug_deduct_einsatz_min: deductFromReadyEinsatzMin,
+      debug_deduct_nb_min: deductFromReadyNBMin,
+      debug_remaining_ready_min: remainingReadyMin
     };
   }
 
@@ -1035,23 +1208,7 @@
     });
   }
 
-  // === Event-Handler für Toolbar ===
-  document.getElementById('btn-add-day').addEventListener('click', () => {
-    createDayCard();
-  });
-
-  document.getElementById('btn-compute-all').addEventListener('click', () => {
-    computeAllDaysAndUpdateSummary();
-  });
-
-  document.getElementById('btn-einsatz-png').addEventListener('click', () => {
-    generateEinsatzPNG();
-  });
-
-  document.getElementById('btn-bereitschaft-png').addEventListener('click', () => {
-    generateBereitschaftPNG();
-  });
-
+  // === Event-Handler Buttons ===
   document.getElementById('btn-save').addEventListener('click', () => {
     try {
       const data = collectRawData();
@@ -1063,7 +1220,6 @@
       let fname = "hn-bauer-daten.json";
 
       try {
-        // Letztes (spätestes) gültiges Datum aus allen Tagen suchen
         let lastDate = null;
         data.days.forEach(day => {
           if (day.date) {
@@ -1073,7 +1229,7 @@
                 lastDate = d;
               }
             } catch (e) {
-              // ignorieren, wenn ein Datum falsch formatiert ist
+              // ignorieren
             }
           }
         });
@@ -1081,11 +1237,10 @@
         if (lastDate) {
           const year = lastDate.getFullYear();
           const monthName = MONTH_NAMES[lastDate.getMonth()];
-          // z.B. ABW_HN_November_2025.json
           fname = `ABW_HN_${monthName}_${year}.json`;
         }
       } catch (e) {
-        // falls etwas schiefgeht, bleibt der Fallback-Name
+        // Fallback-Name bleibt
       }
 
       const blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
@@ -1121,7 +1276,35 @@
     reader.readAsText(file);
   });
 
-  // Ersten Tag automatisch anlegen (unsichtbar, bis Login ok)
+  document.getElementById('btn-add-day').addEventListener('click', () => {
+    createDayCard();
+  });
+
+  document.getElementById('btn-compute-all').addEventListener('click', () => {
+    try {
+      computeAllDaysAndUpdateSummary();
+    } catch (e) {
+      alert("Fehler beim Berechnen aller Tage:\n\n" + e.message);
+    }
+  });
+
+  document.getElementById('btn-einsatz-png').addEventListener('click', () => {
+    try {
+      generateEinsatzPNG();
+    } catch (e) {
+      alert("Fehler beim Erzeugen der Einsatz-Tabelle:\n\n" + e.message);
+    }
+  });
+
+  document.getElementById('btn-bereitschaft-png').addEventListener('click', () => {
+    try {
+      generateBereitschaftPNG();
+    } catch (e) {
+      alert("Fehler beim Erzeugen der Bereitschafts-Tabelle:\n\n" + e.message);
+    }
+  });
+
+  // Ersten Tag automatisch anlegen
   createDayCard();
 
   // === Login-Logik ===
@@ -1133,7 +1316,6 @@
   const loginScreen = document.getElementById("login-screen");
   const appContainer = document.getElementById("app");
 
-  // Hilfsfunktion: SHA-256 mit Web Crypto API
   async function sha256Hex(str) {
     const encoder = new TextEncoder();
     const data = encoder.encode(str);
@@ -1143,29 +1325,23 @@
   }
 
   if (loginForm && loginPasswordInput && loginScreen && appContainer) {
-    // Falls der Browser kein crypto.subtle unterstützt
     if (!window.crypto || !crypto.subtle) {
       loginError.textContent = "Dieser Browser unterstützt den Login nicht (kein crypto.subtle).";
       loginPasswordInput.disabled = true;
     } else {
       loginForm.addEventListener("submit", async function (e) {
         e.preventDefault();
-
-        // Eventuelle Leerzeichen vorne/hinten entfernen
         const entered = (loginPasswordInput.value || "").trim();
 
         try {
           const hash = await sha256Hex(entered);
-
           console.log("Eingegebener Hash:", hash);
 
           if (hash === PASSWORD_HASH) {
-            // korrektes Passwort
             loginError.textContent = "";
             loginScreen.style.display = "none";
             appContainer.style.display = "block";
           } else {
-            // falsches Passwort
             loginError.textContent = "Falsches Passwort.";
             loginPasswordInput.value = "";
             loginPasswordInput.focus();
@@ -1180,4 +1356,5 @@
 </script>
 </body>
 </html>
+
 
