@@ -1,1 +1,1 @@
-A custom Regulatory Logic Engine that automates the production of complex fee notes, transforming a manual, high-error process into a reproducible, compliant workflow.
+a specialized web application that automates the generation of regulatory fee notes. It replaces manual calculations with a deterministic rule engine, handling complex overlaps between on-call shifts and active service periods to ensure 100% billing accuracy.
